@@ -6,6 +6,5 @@ namespace TheLongShockProper
     {
         public List<string> BeforeCrashParts;
         public float CrashDelta;
-        public int FrameCounter = 0;
     }
 }
