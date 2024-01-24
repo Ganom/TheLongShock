@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using JetBrains.Annotations;
 using TLDLoader;
 using UnityEngine;
 
@@ -15,11 +16,9 @@ namespace TheLongShockProper
         public override string Version => "1";
 
         private static string _error = "";
-        private static string _crash = "";
-        private static string _lostParts = "";
-        private static float _test;
 
         private static readonly List<string> ShocksSent = new List<string>();
+        private readonly Queue<List<string>> _beforeCarParts = new Queue<List<string>>();
 
         private fpscontroller _player;
         private ShockHandler _shockHandler;
@@ -29,7 +28,8 @@ namespace TheLongShockProper
         private DateTime _lastShockSentTime;
 
         private List<string> _currentCarParts = new List<string>();
-        private List<string> _beforeCarParts = new List<string>();
+        [CanBeNull] private CrashEvent _crashEvent;
+        private int _frameCounter;
 
         public override void OnGUI()
         {
@@ -38,22 +38,18 @@ namespace TheLongShockProper
                 GUI.Label(
                     new Rect(75, 0, 2000, 3000),
                     "<color=red><size=32>" +
-                    $"\nTest:{_test}" +
-                    $"\nCrash:{_crash}" +
-                    $"\nLost Parts:{_lostParts}" +
                     $"\n{string.Join("\n", ShocksSent)}" +
                     "</size></color>"
                 );
+                return;
             }
-            else
-            {
-                GUI.Label(
-                    new Rect(75, 0, 2000, 3000),
-                    "<color=red><size=48>" +
-                    $"\nERROR PING GANOM:{_error}" +
-                    "</size></color>"
-                );
-            }
+
+            GUI.Label(
+                new Rect(75, 0, 2000, 3000),
+                "<color=red><size=48>" +
+                $"\nERROR PING GANOM:{_error}" +
+                "</size></color>"
+            );
         }
 
         public override void OnLoad()
@@ -61,16 +57,13 @@ namespace TheLongShockProper
             _lastShockSentTime = DateTime.MinValue;
             _player = mainscript.M.player;
             _shockHandler = new GameObject("ShockHandler").AddComponent<ShockHandler>();
-            ShocksSent.Clear();
             _currentCarParts.Clear();
             _beforeCarParts.Clear();
+            _beforeCarParts.Enqueue(new List<string>());
             _lastSpeed = 0;
             _crashDelta = 0;
-            _crash = "";
-            _lostParts = "";
-            _test = 0;
             _error = "";
-
+            ShocksSent.Clear();
             InitConfig();
         }
 
@@ -98,10 +91,27 @@ namespace TheLongShockProper
 
                 _currentCarParts = CountCarParts(car);
 
+                if (_crashEvent != null)
+                {
+                    _frameCounter++;
+
+                    if (_frameCounter < 60) return;
+
+                    CalculateLostPartsAndSendShock(_crashEvent);
+                    _crashEvent = null;
+                    _frameCounter = 0;
+                    return;
+                }
+
                 DetectCrashUpdateLoop(car);
                 CheckIfPartsWereLost();
 
-                _beforeCarParts = _currentCarParts;
+                if (_beforeCarParts.Count >= 60)
+                {
+                    _beforeCarParts.Dequeue();
+                }
+
+                _beforeCarParts.Enqueue(_currentCarParts);
             }
             catch (Exception e)
             {
@@ -111,7 +121,8 @@ namespace TheLongShockProper
 
         private void CheckIfPartsWereLost()
         {
-            var missingParts = GetListDifferences(_beforeCarParts, _currentCarParts);
+            var earliest = _beforeCarParts.Peek();
+            var missingParts = GetListDifferences(earliest, _currentCarParts);
 
             if (!missingParts.Any())
             {
@@ -120,26 +131,21 @@ namespace TheLongShockProper
 
             if (!(_crashDelta > 0)) return;
 
-            var crashEvent = new CrashEvent
+            _crashEvent = new CrashEvent
             {
-                BeforeCrashParts = _beforeCarParts,
+                BeforeCrashParts = earliest,
                 CrashDelta = _crashDelta
             };
-
-            CalculateLostPartsAndSendShock(crashEvent);
+            _crashDelta = 0;
         }
 
         private void CalculateLostPartsAndSendShock(CrashEvent @event)
         {
             if (_player.died)
             {
-                _lostParts = "";
-                _test = _crashDelta;
-                _crash = "HAH YOU DIED LOSER";
-                _crashDelta = 0;
                 ShocksSent.Add(
                     $"death shock:{_config.deathShockOverride}," +
-                    $"delta:{_crashDelta}," +
+                    $"delta:{@event.CrashDelta}," +
                     $"timestamp:{DateTime.Now:dd_HH:mm:ss.fff}"
                 );
                 _shockHandler.SendShock(_config.deathShockOverride, _config);
@@ -152,15 +158,10 @@ namespace TheLongShockProper
             var bonusShock = missingParts
                 .Where(missingPart => highValuePartsArray.Contains(missingPart))
                 .Sum(missingPart => _config.highValuePartBonusShock);
-
             var missingPartsCsv = string.Join(",", missingParts);
-            _lostParts = missingPartsCsv;
-            _test = _crashDelta;
 
             if (bonusShock == 0)
             {
-                _crashDelta = 0;
-                _crash = $"False; no bonus. delta:{_crashDelta}.";
                 return;
             }
 
@@ -177,19 +178,14 @@ namespace TheLongShockProper
                 _config.maxShockLimiter
             );
 
-            _lostParts = missingPartsCsv;
-            _test = _crashDelta;
-            _crash = $"True; shock:{shockPercent},delta:{_crashDelta},blood:{_player.Car.blood.ON},bonus:{bonusShock}";
-            _crashDelta = 0;
-            
-            if (DateTime.Now - _lastShockSentTime < TimeSpan.FromSeconds(30)) 
+            if (DateTime.Now - _lastShockSentTime < TimeSpan.FromSeconds(_config.shockLockoutTimeSeconds))
             {
                 return;
             }
-            
+
             ShocksSent.Add(
                 $"shock:{shockPercent}," +
-                $"delta:{_crashDelta}," +
+                $"delta:{@event.CrashDelta}," +
                 $"blood:{_player.Car.blood.ON}," +
                 $"bonus:{bonusShock}," +
                 $"parts:{missingPartsCsv}," +
@@ -239,7 +235,6 @@ namespace TheLongShockProper
                     mainscript.M.crashSpeedMaxFallOffMax,
                     v
                 );
-            _test = _crashDelta;
         }
 
         private static List<string> CountCarParts(carscript car)

@@ -14,6 +14,7 @@ namespace TheLongShockProper
         public int bloodBonusShock;
         public int maxShockLimiter;
         public int deathShockOverride;
+        public int shockLockoutTimeSeconds;
         public bool testMode;
     }
 }
