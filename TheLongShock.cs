@@ -17,7 +17,6 @@ namespace TheLongShockProper
 
         private static string _error = "";
 
-        private static readonly List<string> ShocksSent = new List<string>();
         private readonly Queue<List<string>> _beforeCarParts = new Queue<List<string>>();
 
         private fpscontroller _player;
@@ -33,16 +32,7 @@ namespace TheLongShockProper
 
         public override void OnGUI()
         {
-            if (_error == "")
-            {
-                GUI.Label(
-                    new Rect(75, 0, 2000, 3000),
-                    "<color=red><size=32>" +
-                    $"\n{string.Join("\n", ShocksSent)}" +
-                    "</size></color>"
-                );
-                return;
-            }
+            if (_error == "") return;
 
             GUI.Label(
                 new Rect(75, 0, 2000, 3000),
@@ -63,7 +53,6 @@ namespace TheLongShockProper
             _lastSpeed = 0;
             _crashDelta = 0;
             _error = "";
-            ShocksSent.Clear();
             InitConfig();
         }
 
@@ -143,7 +132,7 @@ namespace TheLongShockProper
         {
             if (_player.died)
             {
-                ShocksSent.Add(
+                WriteToLogFile(
                     $"death shock:{_config.deathShockOverride}," +
                     $"delta:{@event.CrashDelta}," +
                     $"timestamp:{DateTime.Now:dd_HH:mm:ss.fff}"
@@ -183,7 +172,7 @@ namespace TheLongShockProper
                 return;
             }
 
-            ShocksSent.Add(
+            WriteToLogFile(
                 $"shock:{shockPercent}," +
                 $"delta:{@event.CrashDelta}," +
                 $"blood:{_player.Car.blood.ON}," +
@@ -296,6 +285,17 @@ namespace TheLongShockProper
             }
 
             return differences;
+        }
+
+        private void WriteToLogFile(string message)
+        {
+            var docPath = Environment.GetFolderPath(Environment.SpecialFolder.Personal) + @"\TheLongDrive\Mods\";
+            var logFilePath = Path.Combine(docPath, "shock.log");
+
+            using (var writer = new StreamWriter(logFilePath, true))
+            {
+                writer.WriteLine(message);
+            }
         }
     }
 }
