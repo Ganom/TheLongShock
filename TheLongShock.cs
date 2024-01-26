@@ -166,9 +166,11 @@ namespace TheLongShockProper
 
             if (DateTime.Now - _lastShockSentTime < TimeSpan.FromSeconds(_config.shockLockoutTimeSeconds))
             {
+                var remainingTime = TimeSpan.FromSeconds(_config.shockLockoutTimeSeconds) - (DateTime.Now - _lastShockSentTime);
+                
                 WriteToLogFile(
                     "IGNORED " +
-                    $"delayLeft:{DateTime.Now - _lastShockSentTime}," +
+                    $"delayLeft:{remainingTime.ToString()}," +
                     $"shock:{shockPercent}," +
                     $"delta:{@event.CrashDelta}," +
                     $"blood:{_player.Car.blood.ON}," +
