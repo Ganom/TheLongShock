@@ -25,6 +25,7 @@ namespace TheLongShockProper
         private float _lastSpeed;
         private float _crashDelta;
         private DateTime _lastShockSentTime;
+        private bool _deathLock;
 
         private List<string> _currentCarParts = new List<string>();
         [CanBeNull] private CrashEvent _crashEvent;
@@ -52,6 +53,7 @@ namespace TheLongShockProper
             _beforeCarParts.Enqueue(new List<string>());
             _lastSpeed = 0;
             _crashDelta = 0;
+            _deathLock = false;
             _error = "";
             InitConfig();
         }
@@ -132,11 +134,13 @@ namespace TheLongShockProper
         {
             if (_player.died)
             {
+                if (_deathLock) return;
                 WriteToLogFile(
                     $"death shock:{_config.deathShockOverride}," +
                     $"delta:{@event.CrashDelta}," +
                     $"timestamp:{DateTime.Now:dd_HH:mm:ss.fff}"
                 );
+                _deathLock = true;
                 _shockHandler.SendShock(_config.deathShockOverride, _config);
                 _lastShockSentTime = DateTime.Now;
                 return;
@@ -169,6 +173,16 @@ namespace TheLongShockProper
 
             if (DateTime.Now - _lastShockSentTime < TimeSpan.FromSeconds(_config.shockLockoutTimeSeconds))
             {
+                WriteToLogFile(
+                    "IGNORED " +
+                    $"delayLeft:{DateTime.Now - _lastShockSentTime}," +
+                    $"shock:{shockPercent}," +
+                    $"delta:{@event.CrashDelta}," +
+                    $"blood:{_player.Car.blood.ON}," +
+                    $"bonus:{bonusShock}," +
+                    $"parts:{missingPartsCsv}," +
+                    $"timestamp:{DateTime.Now:dd_HH:mm:ss.fff}"
+                );
                 return;
             }
 
