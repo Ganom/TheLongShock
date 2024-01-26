@@ -89,6 +89,7 @@ namespace TheLongShockProper
                     CalculateLostPartsAndSendShock(_crashEvent);
                     _crashEvent = null;
                     _frameCounter = 0;
+                    _beforeCarParts = _currentCarParts;
                     return;
                 }
 
