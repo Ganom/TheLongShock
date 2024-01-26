@@ -17,8 +17,6 @@ namespace TheLongShockProper
 
         private static string _error = "";
 
-        private readonly Queue<List<string>> _beforeCarParts = new Queue<List<string>>();
-
         private fpscontroller _player;
         private ShockHandler _shockHandler;
         private ConfigData _config;
@@ -28,6 +26,7 @@ namespace TheLongShockProper
         private bool _deathLock;
 
         private List<string> _currentCarParts = new List<string>();
+        private List<string> _beforeCarParts = new List<string>();
         [CanBeNull] private CrashEvent _crashEvent;
         private int _frameCounter;
 
@@ -50,7 +49,6 @@ namespace TheLongShockProper
             _shockHandler = new GameObject("ShockHandler").AddComponent<ShockHandler>();
             _currentCarParts.Clear();
             _beforeCarParts.Clear();
-            _beforeCarParts.Enqueue(new List<string>());
             _lastSpeed = 0;
             _crashDelta = 0;
             _deathLock = false;
@@ -97,12 +95,7 @@ namespace TheLongShockProper
                 DetectCrashUpdateLoop(car);
                 CheckIfPartsWereLost();
 
-                if (_beforeCarParts.Count >= 60)
-                {
-                    _beforeCarParts.Dequeue();
-                }
-
-                _beforeCarParts.Enqueue(_currentCarParts);
+                _beforeCarParts = _currentCarParts;
             }
             catch (Exception e)
             {
@@ -112,8 +105,7 @@ namespace TheLongShockProper
 
         private void CheckIfPartsWereLost()
         {
-            var earliest = _beforeCarParts.Peek();
-            var missingParts = GetListDifferences(earliest, _currentCarParts);
+            var missingParts = GetListDifferences(_beforeCarParts, _currentCarParts);
 
             if (!missingParts.Any())
             {
@@ -124,7 +116,7 @@ namespace TheLongShockProper
 
             _crashEvent = new CrashEvent
             {
-                BeforeCrashParts = earliest,
+                BeforeCrashParts = _beforeCarParts,
                 CrashDelta = _crashDelta
             };
             _crashDelta = 0;
