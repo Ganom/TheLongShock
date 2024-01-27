@@ -75,6 +75,11 @@ namespace TheLongShockProper
 
                 if (car == null)
                 {
+                    _crashDelta = 0;
+                    _crashEvent = null;
+                    _frameCounter = 0;
+                    _beforeCarParts.Clear();
+                    _currentCarParts.Clear();
                     return;
                 }
 
